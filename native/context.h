@@ -9,12 +9,26 @@
 #include <jni.h>
 
 #include "include/base/cef_macros.h"
+#include "include/base/cef_scoped_ptr.h"
 #include "include/base/cef_thread_checker.h"
+
+#include "temp_window.h"
+
+#if defined(OS_MACOSX)
+#include "include/wrapper/cef_library_loader.h"
+#endif
 
 class Context {
  public:
   static void Create();
   static void Destroy();
+
+#if defined(OS_MACOSX)
+  void set_library_loader(CefScopedLibraryLoader* library_loader) {
+    DCHECK(!library_loader_);
+    library_loader_.reset(library_loader);
+  }
+#endif
 
   // Returns the singleton instance of this object.
   static Context* GetInstance();
@@ -25,6 +39,7 @@ class Context {
                   jstring argPathToJavaDLL,
                   jobject appHandler,
                   jobject jsettings);
+  void OnContextInitialized();
   void DoMessageLoopWork();
   void Shutdown();
 
@@ -34,6 +49,12 @@ class Context {
 
   bool external_message_pump_;
   base::ThreadChecker thread_checker_;
+
+  scoped_ptr<TempWindow> temp_window_;
+
+#if defined(OS_MACOSX)
+  scoped_ptr<CefScopedLibraryLoader> library_loader_;
+#endif
 
   DISALLOW_COPY_AND_ASSIGN(Context);
 };

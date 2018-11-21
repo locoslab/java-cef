@@ -56,6 +56,8 @@ jclass FindClass(JNIEnv* env, const char* class_name);
 
 #if defined(OS_WIN)
 HWND GetHwndOfCanvas(jobject canvas, JNIEnv* env);
+#elif defined(OS_LINUX)
+unsigned long GetDrawableOfCanvas(jobject canvas, JNIEnv* env);
 #endif
 
 // Create a new JNI object and call the default constructor.
@@ -156,6 +158,13 @@ bool GetJNIFieldInt(JNIEnv* env,
                     jobject obj,
                     const char* field_name,
                     int* value);
+
+// Retrieve the long value stored in the |field_name| field of |cls|.
+bool GetJNIFieldLong(JNIEnv* env,
+                     jclass cls,
+                     jobject obj,
+                     const char* field_name,
+                     jlong* value);
 
 // Set the int value stored in the |field_name| field of |cls|.
 bool SetJNIFieldInt(JNIEnv* env,
@@ -324,10 +333,10 @@ bool SetCefForJNIObject(JNIEnv* env,
                         jobject obj,
                         T* base,
                         const char* varName) {
-  jstring identifer = env->NewStringUTF(varName);
-  jlong previousValue = 0;
   if (!obj)
     return false;
+  jstring identifer = env->NewStringUTF(varName);
+  jlong previousValue = 0;
   JNI_CALL_METHOD(env, obj, "getNativeRef", "(Ljava/lang/String;)J", Long,
                   previousValue, identifer);
 
@@ -343,6 +352,7 @@ bool SetCefForJNIObject(JNIEnv* env,
     // Add a reference to the new base object.
     SetCefForJNIObjectHelper::AddRef(base);
   }
+  env->DeleteLocalRef(identifer);
   return true;
 }
 
@@ -355,6 +365,7 @@ T* GetCefFromJNIObject(JNIEnv* env, jobject obj, const char* varName) {
     JNI_CALL_METHOD(env, obj, "getNativeRef", "(Ljava/lang/String;)J", Long,
                     previousValue, identifer);
 
+  env->DeleteLocalRef(identifer);
   if (previousValue != 0)
     return reinterpret_cast<T*>(previousValue);
   return NULL;

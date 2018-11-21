@@ -8,18 +8,16 @@
 #include <jawt.h>
 #include <jawt_md.h>
 
-HWND GetHwndOfCanvas(jobject canvas, JNIEnv* env) {
+unsigned long GetDrawableOfCanvas(jobject canvas, JNIEnv* env) {
   JAWT awt;
   JAWT_DrawingSurface* ds;
   JAWT_DrawingSurfaceInfo* dsi;
-  JAWT_Win32DrawingSurfaceInfo* dsi_win;
-  jboolean bGetAwt;
+  JAWT_X11DrawingSurfaceInfo* dsi_x11;
   jint lock;
 
   // Get the AWT.
   awt.version = JAWT_VERSION_1_4;
-  bGetAwt = JAWT_GetAWT(env, &awt);
-  assert(bGetAwt != JNI_FALSE);
+  JAWT_GetAWT(env, &awt);
 
   // Get the drawing surface.
   ds = awt.GetDrawingSurface(env, canvas);
@@ -41,8 +39,8 @@ HWND GetHwndOfCanvas(jobject canvas, JNIEnv* env) {
   }
 
   // Get the platform-specific drawing info.
-  dsi_win = (JAWT_Win32DrawingSurfaceInfo*)dsi->platformInfo;
-  HWND result = dsi_win->hwnd;
+  dsi_x11 = (JAWT_X11DrawingSurfaceInfo*)dsi->platformInfo;
+  Drawable result = dsi_x11->drawable;
 
   // Free the drawing surface info
   ds->FreeDrawingSurfaceInfo(dsi);

@@ -20,17 +20,18 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.nio.ByteBuffer;
 
-import javax.media.nativewindow.NativeSurface;
-import javax.media.opengl.awt.GLCanvas;
-import javax.media.opengl.GLAutoDrawable;
-import javax.media.opengl.GLEventListener;
-import javax.media.opengl.GLProfile;
-import javax.media.opengl.GLCapabilities;
+import com.jogamp.nativewindow.NativeSurface;
+import com.jogamp.opengl.awt.GLCanvas;
+import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.GLEventListener;
+import com.jogamp.opengl.GLProfile;
+import com.jogamp.opengl.GLCapabilities;
+
 import javax.swing.MenuSelectionManager;
 import javax.swing.SwingUtilities;
 
+import org.cef.CefClient;
 import org.cef.callback.CefDragData;
-import org.cef.handler.CefClientHandler;
 import org.cef.handler.CefRenderHandler;
 
 /**
@@ -44,31 +45,24 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
     private long window_handle_ = 0;
     private Rectangle browser_rect_ = new Rectangle(0, 0, 1, 1); // Work around CEF issue #1437.
     private Point screenPoint_ = new Point(0, 0);
-    private CefClientHandler clientHandler_;
-    private String url_;
     private boolean isTransparent_;
-    private CefRequestContext context_;
-    private CefBrowserOsr parent_ = null;
-    private Point inspectAt_ = null;
-    private CefBrowserOsr devTools_ = null;
-    ;
 
-    CefBrowserOsr(CefClientHandler clientHandler, String url, boolean transparent,
-            CefRequestContext context) {
-        this(clientHandler, url, transparent, context, null, null);
+    CefBrowserOsr(CefClient client, String url, boolean transparent, CefRequestContext context) {
+        this(client, url, transparent, context, null, null);
     }
 
-    private CefBrowserOsr(CefClientHandler clientHandler, String url, boolean transparent,
+    private CefBrowserOsr(CefClient client, String url, boolean transparent,
             CefRequestContext context, CefBrowserOsr parent, Point inspectAt) {
-        super();
+        super(client, url, context, parent, inspectAt);
         isTransparent_ = transparent;
         renderer_ = new CefRenderer(transparent);
-        clientHandler_ = clientHandler;
-        url_ = url;
-        context_ = context;
-        parent_ = parent;
-        inspectAt_ = inspectAt;
         createGLCanvas();
+    }
+
+    @Override
+    public void createImmediately() {
+        // Create the browser immediately.
+        createBrowserIfRequired(false);
     }
 
     @Override
@@ -82,31 +76,13 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
     }
 
     @Override
-    public synchronized void close() {
-        if (context_ != null) context_.dispose();
-        if (parent_ != null) {
-            parent_.closeDevTools();
-            parent_.devTools_ = null;
-            parent_ = null;
-        }
-        super.close();
+    protected CefBrowser_N createDevToolsBrowser(CefClient client, String url,
+            CefRequestContext context, CefBrowser_N parent, Point inspectAt) {
+        return new CefBrowserOsr(
+                client, url, isTransparent_, context, (CefBrowserOsr) this, inspectAt);
     }
 
-    @Override
-    public synchronized CefBrowser getDevTools() {
-        return getDevTools(null);
-    }
-
-    @Override
-    public synchronized CefBrowser getDevTools(Point inspectAt) {
-        if (devTools_ == null) {
-            devTools_ = new CefBrowserOsr(
-                    clientHandler_, url_, isTransparent_, context_, this, inspectAt);
-        }
-        return devTools_;
-    }
-
-    private long getWindowHandle() {
+    private synchronized long getWindowHandle() {
         if (window_handle_ == 0) {
             NativeSurface surface = canvas_.getNativeSurface();
             if (surface != null) {
@@ -126,13 +102,7 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
         canvas_ = new GLCanvas(glcapabilities) {
             @Override
             public void paint(Graphics g) {
-                if (parent_ != null) {
-                    createDevTools(parent_, clientHandler_, getWindowHandle(), isTransparent_, null,
-                            inspectAt_);
-                } else {
-                    createBrowser(clientHandler_, getWindowHandle(), url_, isTransparent_, null,
-                            context_);
-                }
+                createBrowserIfRequired(true);
                 super.paint(g);
             }
         };
@@ -297,5 +267,25 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
     @Override
     public void updateDragCursor(CefBrowser browser, int operation) {
         // TODO(JCEF) Prepared for DnD support using OSR mode.
+    }
+
+    private void createBrowserIfRequired(boolean hasParent) {
+        long windowHandle = 0;
+        if (hasParent) {
+            windowHandle = getWindowHandle();
+        }
+
+        if (getNativeRef("CefBrowser") == 0) {
+            if (getParentBrowser() != null) {
+                createDevTools(getParentBrowser(), getClient(), windowHandle, true, isTransparent_,
+                        null, getInspectAt());
+            } else {
+                createBrowser(getClient(), windowHandle, getUrl(), true, isTransparent_, null,
+                        getRequestContext());
+            }
+        } else {
+            // OSR windows cannot be reparented after creation.
+            setFocus(true);
+        }
     }
 }

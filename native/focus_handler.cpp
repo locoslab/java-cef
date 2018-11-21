@@ -29,14 +29,6 @@ void FocusHandler::OnTakeFocus(CefRefPtr<CefBrowser> browser, bool next) {
                        GetJNIBrowser(browser), (jboolean)next);
 }
 
-#if defined(OS_WIN)
-static void FocusParent(HWND browserHandle) {
-  HWND parent = GetParent(browserHandle);
-  SetActiveWindow(parent);
-  SetFocus(parent);
-}
-#endif
-
 bool FocusHandler::OnSetFocus(CefRefPtr<CefBrowser> browser,
                               FocusSource source) {
   JNIEnv* env = GetJNIEnv();
@@ -57,13 +49,13 @@ bool FocusHandler::OnSetFocus(CefRefPtr<CefBrowser> browser,
                   "CefFocusHandler$FocusSource;)Z",
                   Boolean, jreturn, GetJNIBrowser(browser), jsource);
   bool result = (jreturn != JNI_FALSE);
-#if defined(OS_WIN)
+#if (defined(OS_WIN) || defined(OS_LINUX))
   if (result) {
-    HWND browserHandle = browser->GetHost()->GetWindowHandle();
+    CefWindowHandle browserHandle = browser->GetHost()->GetWindowHandle();
     if (CefCurrentlyOn(TID_UI))
-      FocusParent(browserHandle);
+      util::FocusParent(browserHandle);
     else
-      CefPostTask(TID_UI, base::Bind(&FocusParent, browserHandle));
+      CefPostTask(TID_UI, base::Bind(util::FocusParent, browserHandle));
   }
 #endif
   return result;

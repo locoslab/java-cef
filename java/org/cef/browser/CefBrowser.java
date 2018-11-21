@@ -8,6 +8,7 @@ import java.awt.Component;
 import java.awt.Point;
 import java.util.Vector;
 
+import org.cef.CefClient;
 import org.cef.callback.CefPdfPrintCallback;
 import org.cef.callback.CefRunFileDialogCallback;
 import org.cef.callback.CefStringVisitor;
@@ -22,10 +23,23 @@ import org.cef.network.CefRequest;
  */
 public interface CefBrowser {
     /**
+     * Call to immediately create the underlying browser object. By default the
+     * browser object will be created when the parent container is displayed for
+     * the first time.
+     */
+    public void createImmediately();
+
+    /**
      * Get the underlying UI component (e.g. java.awt.Canvas).
      * @return The underlying UI component.
      */
     public Component getUIComponent();
+
+    /**
+     * Get the client associated with this browser.
+     * @return The browser client.
+     */
+    public CefClient getClient();
 
     /**
      * Get an implementation of CefRenderHandler if any.
@@ -221,9 +235,25 @@ public interface CefBrowser {
     // The following methods are forwarded to CefBrowserHost.
 
     /**
-     * Close the browser.
+     * Request that the browser close.
+     * @param force force the close.
      */
-    public void close();
+    public void close(boolean force);
+
+    /**
+     * Allow the browser to close.
+     */
+    public void setCloseAllowed();
+
+    /**
+     * Called from CefClient.doClose.
+     */
+    public boolean doClose();
+
+    /**
+     * Called from CefClient.onBeforeClose.
+     */
+    public void onBeforeClose();
 
     /**
      * Set or remove keyboard focus to/from the browser window.
@@ -287,10 +317,10 @@ public interface CefBrowser {
      * Print the current browser contents.
      */
     public void print();
-    
+
     /**
      * Print the current browser contents to a PDF.
-     * 
+     *
      * @param path The path of the file to write to (will be overwritten if it
      *      already exists).  Cannot be null.
      * @param settings The pdf print settings to use.  If null then defaults

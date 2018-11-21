@@ -86,13 +86,28 @@ bool Context::Initialize(JNIEnv* env,
   //   renderer process.
   settings.no_sandbox = true;
 
-#if defined(OS_WIN)
+#if defined(OS_WIN) || defined(OS_LINUX)
   // Use external message pump with OSR.
   external_message_pump_ = !!settings.windowless_rendering_enabled;
   if (!external_message_pump_) {
     // Windowed rendering on Windows requires multi-threaded message loop,
     // otherwise something eats the messages required by Java and the Java
     // window becomes unresponsive.
+    //
+    // Actually the same appears to be true for Linux, which is why we also
+    // need multithreaded message loops there. Note that however, on Linux
+    // it is more difficult to get this to work: it is necessary for the first
+    // call to Xlib to be a call to XInitThreads! Since Java itself calls
+    // Xlib when it initializes the first window, an application must make
+    // sure to invoke this method before any other Xlib functions are called
+    // - including by the Java runtime itself, which makes this feat a little
+    // tricky. The CefApp class exposes a static method for this purpose,
+    // initXlibForMultithreading(), but the host application must load the
+    // jcef native lib by itself in order to use it, and it must invoke it
+    // VERY early, ideally at the beginning of the main method.
+    // Another neat trick to get this done is to create a special native lib
+    // just for this purpose like described in this StackOverflow thread:
+    // https://stackoverflow.com/questions/24559368
     settings.multi_threaded_message_loop = true;
   }
 #endif
@@ -125,6 +140,21 @@ bool Context::Initialize(JNIEnv* env,
   return res;
 }
 
+void Context::OnContextInitialized() {
+  REQUIRE_UI_THREAD();
+  temp_window_.reset(new TempWindow());
+}
+
+void Context::DoMessageLoopWork() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+#if defined(OS_MACOSX)
+  util_mac::CefDoMessageLoopWorkOnMainThread();
+#else
+  CefDoMessageLoopWork();
+#endif
+}
+
 void Context::Shutdown() {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -141,23 +171,22 @@ void Context::Shutdown() {
       CefDoMessageLoopWork();
   }
 
+  temp_window_.reset(nullptr);
+
   CefShutdown();
-#endif
-}
-
-void Context::DoMessageLoopWork() {
-  DCHECK(thread_checker_.CalledOnValidThread());
-
-#if defined(OS_MACOSX)
-  util_mac::CefDoMessageLoopWorkOnMainThread();
-#else
-  CefDoMessageLoopWork();
 #endif
 }
 
 Context::Context() : external_message_pump_(true) {
   DCHECK(!g_context);
   g_context = this;
+
+#if defined(OS_MACOSX)
+  // On macOS we create this object very early to allow LibraryLoader
+  // assignment. However, we still want the PreInitialize() call to determine
+  // thread ownership.
+  thread_checker_.DetachFromThread();
+#endif
 }
 
 Context::~Context() {

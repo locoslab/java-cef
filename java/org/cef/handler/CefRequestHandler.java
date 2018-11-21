@@ -25,7 +25,8 @@ public interface CefRequestHandler {
     enum TerminationStatus {
         TS_ABNORMAL_TERMINATION, //!< Non-zero exit status.
         TS_PROCESS_WAS_KILLED, //!< SIGKILL or task manager kill.
-        TS_PROCESS_CRASHED //!< Segmentation fault.
+        TS_PROCESS_CRASHED, //!< Segmentation fault.
+        TS_PROCESS_OOM //!< Out of memory.
     }
 
     /**
@@ -43,11 +44,12 @@ public interface CefRequestHandler {
      * @param frame The frame generating the event. Instance only valid within
      *      the scope of this method.
      * @param request The request itself. Can't be modified.
+     * @param user_gesture true if the request was initiated by a user gesture.
      * @param is_redirect true if the request was redirected.
      * @return true to cancel or false to allow to proceed.
      */
-    boolean onBeforeBrowse(
-            CefBrowser browser, CefFrame frame, CefRequest request, boolean is_redirect);
+    boolean onBeforeBrowse(CefBrowser browser, CefFrame frame, CefRequest request,
+            boolean user_gesture, boolean is_redirect);
 
     /**
      * Called on the IO thread before a resource request is loaded.

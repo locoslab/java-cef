@@ -11,7 +11,7 @@ extern "C" {
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_CreateBrowser
  * Signature:
- * (Lorg/cef/handler/CefClientHandler;JLjava/lang/String;ZLjava/awt/Component;Lorg/cef/browser/CefRequestContext;)Z
+ * (Lorg/cef/handler/CefClientHandler;JLjava/lang/String;ZZLjava/awt/Component;Lorg/cef/browser/CefRequestContext;)Z
  */
 JNIEXPORT jboolean JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1CreateBrowser(JNIEnv*,
@@ -20,6 +20,7 @@ Java_org_cef_browser_CefBrowser_1N_N_1CreateBrowser(JNIEnv*,
                                                     jlong,
                                                     jstring,
                                                     jboolean,
+                                                    jboolean,
                                                     jobject,
                                                     jobject);
 
@@ -27,7 +28,7 @@ Java_org_cef_browser_CefBrowser_1N_N_1CreateBrowser(JNIEnv*,
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_CreateDevTools
  * Signature:
- * (Lorg/cef/browser/CefBrowser;Lorg/cef/handler/CefClientHandler;JZLjava/awt/Component;Ljava/awt/Point;)Z
+ * (Lorg/cef/browser/CefBrowser;Lorg/cef/handler/CefClientHandler;JZZLjava/awt/Component;Ljava/awt/Point;)Z
  */
 JNIEXPORT jboolean JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1CreateDevTools(JNIEnv*,
@@ -35,6 +36,7 @@ Java_org_cef_browser_CefBrowser_1N_N_1CreateDevTools(JNIEnv*,
                                                      jobject,
                                                      jobject,
                                                      jlong,
+                                                     jboolean,
                                                      jboolean,
                                                      jobject,
                                                      jobject);
@@ -122,7 +124,7 @@ Java_org_cef_browser_CefBrowser_1N_N_1GetIdentifier(JNIEnv*, jobject);
 /*
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_GetMainFrame
- * Signature: ()Lorg/cef/browser/CefFrame_N;
+ * Signature: ()Lorg/cef/browser/CefFrame;
  */
 JNIEXPORT jobject JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1GetMainFrame(JNIEnv*, jobject);
@@ -130,7 +132,7 @@ Java_org_cef_browser_CefBrowser_1N_N_1GetMainFrame(JNIEnv*, jobject);
 /*
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_GetFocusedFrame
- * Signature: ()Lorg/cef/browser/CefFrame_N;
+ * Signature: ()Lorg/cef/browser/CefFrame;
  */
 JNIEXPORT jobject JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1GetFocusedFrame(JNIEnv*, jobject);
@@ -138,26 +140,18 @@ Java_org_cef_browser_CefBrowser_1N_N_1GetFocusedFrame(JNIEnv*, jobject);
 /*
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_GetFrame
- * Signature: (J)Lorg/cef/browser/CefFrame_N;
+ * Signature: (J)Lorg/cef/browser/CefFrame;
  */
 JNIEXPORT jobject JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1GetFrame(JNIEnv*, jobject, jlong);
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
- * Method:    N_GetFrame
- * Signature: (Ljava/lang/String;)Lorg/cef/browser/CefFrame_N;
+ * Method:    N_GetFrame2
+ * Signature: (Ljava/lang/String;)Lorg/cef/browser/CefFrame;
  */
 JNIEXPORT jobject JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1GetFrame2(JNIEnv*, jobject, jstring);
-
-/*
- * Class:     org_cef_browser_CefBrowser_N
- * Method:    N_GetFrameCount
- * Signature: ()I;
- */
-JNIEXPORT jint JNICALL
-Java_org_cef_browser_CefBrowser_1N_N_1GetFrameCount(JNIEnv*, jobject);
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
@@ -174,6 +168,14 @@ Java_org_cef_browser_CefBrowser_1N_N_1GetFrameIdentifiers(JNIEnv*, jobject);
  */
 JNIEXPORT jobject JNICALL
 Java_org_cef_browser_CefBrowser_1N_N_1GetFrameNames(JNIEnv*, jobject);
+
+/*
+ * Class:     org_cef_browser_CefBrowser_N
+ * Method:    N_GetFrameCount
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL
+Java_org_cef_browser_CefBrowser_1N_N_1GetFrameCount(JNIEnv*, jobject);
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
@@ -271,7 +273,8 @@ JNIEXPORT jstring JNICALL Java_org_cef_browser_CefBrowser_1N_N_1GetURL(JNIEnv*,
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1Close(JNIEnv*,
-                                                                   jobject);
+                                                                   jobject,
+                                                                   jboolean);
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
@@ -342,14 +345,16 @@ JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1Print(JNIEnv*,
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
- * Method:    N_Print
- * Signature: ()V
+ * Method:    N_PrintToPDF
+ * Signature:
+ * (Ljava/lang/String;Lorg/cef/misc/CefPdfPrintSettings;Lorg/cef/callback/CefPdfPrintCallback;)V
  */
-JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1PrintToPDF(JNIEnv*,
-                                                                        jobject,
-                                                                        jstring,
-                                                                        jobject,
-                                                                        jobject);
+JNIEXPORT void JNICALL
+Java_org_cef_browser_CefBrowser_1N_N_1PrintToPDF(JNIEnv*,
+                                                 jobject,
+                                                 jstring,
+                                                 jobject,
+                                                 jobject);
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
@@ -507,6 +512,16 @@ JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1UpdateUI(JNIEnv*,
                                                                       jobject,
                                                                       jobject,
                                                                       jobject);
+
+/*
+ * Class:     org_cef_browser_CefBrowser_N
+ * Method:    N_SetParent
+ * Signature: (Ljava/awt/Canvas;)V
+ */
+JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1SetParent(JNIEnv*,
+                                                                       jobject,
+                                                                       jlong,
+                                                                       jobject);
 
 #ifdef __cplusplus
 }

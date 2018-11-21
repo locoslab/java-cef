@@ -136,12 +136,16 @@ public class MainFrame extends JFrame {
     }
 
     public static void main(String[] args) {
+        // Perform startup initialization on platforms that require it.
+        if (!CefApp.startup()) {
+            System.out.println("Startup initialization failed!");
+            return;
+        }
+
         // The simple example application is created as anonymous class and points
-        // to Google as the very first loaded page. If this example is used on
-        // Linux, it's important to use OSR mode because windowed rendering is not
-        // supported yet. On Macintosh and Windows windowed rendering is used as
-        // default. If you want to test OSR mode on those platforms, simply replace
-        // "OS.isLinux()" with "true" and recompile.
-        new MainFrame("http://www.google.com", OS.isLinux(), false);
+        // to Google as the very first loaded page. Windowed rendering mode is used by
+        // default. If you want to test OSR mode set |useOsr| to true and recompile.
+        boolean useOsr = false;
+        new MainFrame("http://www.google.com", useOsr, false);
     }
 }

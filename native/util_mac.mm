@@ -20,6 +20,7 @@
 #include "critical_wait.h"
 #include "jni_util.h"
 #include "render_handler.h"
+#include "temp_window.h"
 #include "window_handler.h"
 
 namespace {
@@ -66,9 +67,9 @@ bool g_handling_send_event = false;
 @end  // interface CefHandler
 
 // Java provides an NSApplicationAWT implementation that we can't access or
-// override directly. Therefore add the necessary CrAppControlProtocol
+// override directly. Therefore add the necessary CefAppProtocol
 // functionality to NSApplication using categories and swizzling.
-@interface NSApplication (JCEFApplication)
+@interface NSApplication (JCEFApplication)<CefAppProtocol>
 
 - (BOOL)isHandlingSendEvent;
 - (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
@@ -282,7 +283,7 @@ bool g_handling_send_event = false;
 @property(readonly) BOOL isLiveResizing;
 
 - (void)addCefBrowser:(CefRefPtr<CefBrowser>)browser;
-- (void)removeCefBrowser;
+- (void)destroyCefBrowser;
 - (void)updateView:(NSDictionary*)dict;
 @end  // interface CefBrowserContentView
 
@@ -338,10 +339,14 @@ bool g_handling_send_event = false;
            object:[self window]];
 }
 
-- (void)removeCefBrowser {
+- (void)destroyCefBrowser {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   cefBrowser = NULL;
   [self removeFromSuperview];
+  // Also remove all subviews so the CEF objects are released.
+  for (NSView* view in [self subviews]) {
+    [view removeFromSuperview];
+  }
 }
 
 - (void)windowWillStartLiveResize:(NSNotification*)notification {
@@ -385,9 +390,7 @@ bool IsNSView(void* ptr) {
   return result;
 }
 
-CefWindowHandle CreateBrowserContentView(CefWindowHandle cefWindow,
-                                         CefRect& orig) {
-  NSWindow* window = (NSWindow*)cefWindow;
+CefWindowHandle CreateBrowserContentView(NSWindow* window, CefRect& orig) {
   NSView* mainView = (CefWindowHandle)[window contentView];
   TranslateRect(mainView, orig);
   NSRect frame = {{orig.x, orig.y}, {orig.width, orig.height}};
@@ -395,18 +398,18 @@ CefWindowHandle CreateBrowserContentView(CefWindowHandle cefWindow,
   CefBrowserContentView* contentView =
       [[CefBrowserContentView alloc] initWithFrame:frame];
 
-  [mainView addSubview:contentView];
-  [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-  [contentView setNeedsDisplay:YES];
-
   // Make the content view for the window have a layer. This will make all
   // sub-views have layers. This is necessary to ensure correct layer
   // ordering of all child views and their layers.
   [contentView setWantsLayer:YES];
 
+  [mainView addSubview:contentView];
+  [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+  [contentView setNeedsDisplay:YES];
+
   [contentView release];
 
-  // Override origin bevore "orig" is returned because the new origin is
+  // Override origin before "orig" is returned because the new origin is
   // relative to the created CefBrowserContentView object
   orig.x = 0;
   orig.y = 0;
@@ -502,7 +505,7 @@ void AddCefBrowser(CefRefPtr<CefBrowser> browser) {
   [browserImpl addCefBrowser:browser];
 }
 
-void RemoveCefBrowser(CefRefPtr<CefBrowser> browser) {
+void DestroyCefBrowser(CefRefPtr<CefBrowser> browser) {
   if (!browser.get())
     return;
   CefWindowHandle handle = browser->GetHost()->GetWindowHandle();
@@ -517,8 +520,27 @@ void RemoveCefBrowser(CefRefPtr<CefBrowser> browser) {
   if ([superView isKindOfClass:[CefBrowserContentView class]]) {
     CefBrowserContentView* browserView =
         (CefBrowserContentView*)[handle superview];
-    [browserView removeCefBrowser];
+    [browserView destroyCefBrowser];
   }
+}
+
+void SetParent(CefWindowHandle handle, jlong parentHandle) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    CefBrowserContentView* browser_view =
+        (CefBrowserContentView*)[handle superview];
+    [browser_view retain];
+    [browser_view removeFromSuperview];
+
+    NSView* contentView;
+    if (parentHandle) {
+      NSWindow* window = (NSWindow*)parentHandle;
+      contentView = [window contentView];
+    } else {
+      contentView = TempWindow::GetWindowHandle();
+    }
+    [contentView addSubview:browser_view];
+    [browser_view release];
+  });
 }
 
 }  // namespace util
