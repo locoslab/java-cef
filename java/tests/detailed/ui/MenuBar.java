@@ -4,6 +4,18 @@
 
 package tests.detailed.ui;
 
+import org.cef.CefApp;
+import org.cef.CefClient;
+import org.cef.OS;
+import org.cef.browser.CefBrowser;
+import org.cef.callback.CefPdfPrintCallback;
+import org.cef.callback.CefRunFileDialogCallback;
+import org.cef.callback.CefStringVisitor;
+import org.cef.handler.CefDialogHandler.FileDialogMode;
+import org.cef.misc.CefPdfPrintSettings;
+import org.cef.network.CefCookieManager;
+import org.cef.network.CefRequest;
+
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
@@ -32,18 +44,6 @@ import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
-import org.cef.CefApp;
-import org.cef.CefClient;
-import org.cef.OS;
-import org.cef.browser.CefBrowser;
-import org.cef.callback.CefPdfPrintCallback;
-import org.cef.callback.CefRunFileDialogCallback;
-import org.cef.callback.CefStringVisitor;
-import org.cef.handler.CefDialogHandler.FileDialogMode;
-import org.cef.misc.CefPdfPrintSettings;
-import org.cef.network.CefCookieManager;
-import org.cef.network.CefRequest;
-
 import tests.detailed.BrowserFrame;
 import tests.detailed.MainFrame;
 import tests.detailed.dialog.CookieManagerDialog;
@@ -53,6 +53,7 @@ import tests.detailed.dialog.SearchDialog;
 import tests.detailed.dialog.ShowTextDialog;
 import tests.detailed.dialog.UrlRequestDialog;
 import tests.detailed.dialog.WebPluginManagerDialog;
+import tests.detailed.util.DataUri;
 
 @SuppressWarnings("serial")
 public class MenuBar extends JMenuBar {
@@ -77,6 +78,7 @@ public class MenuBar extends JMenuBar {
     private final ControlPanel control_pane_;
     private final DownloadDialog downloadDialog_;
     private final CefCookieManager cookieManager_;
+    private boolean reparentPending_ = false;
 
     public MenuBar(BrowserFrame owner, CefBrowser browser, ControlPanel control_pane,
             DownloadDialog downloadDialog, CefCookieManager cookieManager) {
@@ -299,8 +301,8 @@ public class MenuBar extends JMenuBar {
         testShowText.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                browser_.loadString("<html><body><h1>Hello World</h1></body></html>",
-                        control_pane_.getAddress());
+                browser_.loadURL(DataUri.create(
+                        "text/html", "<html><body><h1>Hello World</h1></body></html>"));
             }
         });
         testMenu.add(testShowText);
@@ -326,7 +328,7 @@ public class MenuBar extends JMenuBar {
                 form += "<p>See implementation of <u>tests.RequestHandler.onBeforeResourceLoad(CefBrowser, CefRequest)</u> for details</p>";
                 form += "</form>";
                 form += "</body></html>";
-                browser_.loadString(form, control_pane_.getAddress());
+                browser_.loadURL(DataUri.create("text/html", form));
             }
         });
         testMenu.add(showForm);
@@ -405,24 +407,31 @@ public class MenuBar extends JMenuBar {
                 reparentButton.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
+                        if (reparentPending_) return;
+                        reparentPending_ = true;
+
                         if (reparentButton.getText().equals("Reparent <")) {
-                            JRootPane rootPane = (JRootPane) owner_.getComponent(0);
-                            Container container = rootPane.getContentPane();
-                            JPanel panel = (JPanel) container.getComponent(0);
-                            newFrame.add(browser_.getUIComponent(), BorderLayout.CENTER);
-                            owner_.removeBrowser();
-                            newFrame.setBrowser(browser_);
-                            reparentButton.setText("Reparent >");
+                            owner_.removeBrowser(new Runnable() {
+                                public void run() {
+                                    newFrame.add(browser_.getUIComponent(), BorderLayout.CENTER);
+                                    newFrame.setBrowser(browser_);
+                                    reparentButton.setText("Reparent >");
+                                    reparentPending_ = false;
+                                }
+                            });
                         } else {
-                            newFrame.remove(browser_.getUIComponent());
-                            JRootPane rootPane = (JRootPane) owner_.getComponent(0);
-                            Container container = rootPane.getContentPane();
-                            JPanel panel = (JPanel) container.getComponent(0);
-                            panel.add(browser_.getUIComponent());
-                            newFrame.removeBrowser();
-                            owner_.setBrowser(browser_);
-                            owner_.revalidate();
-                            reparentButton.setText("Reparent <");
+                            newFrame.removeBrowser(new Runnable() {
+                                public void run() {
+                                    JRootPane rootPane = (JRootPane) owner_.getComponent(0);
+                                    Container container = rootPane.getContentPane();
+                                    JPanel panel = (JPanel) container.getComponent(0);
+                                    panel.add(browser_.getUIComponent());
+                                    owner_.setBrowser(browser_);
+                                    owner_.revalidate();
+                                    reparentButton.setText("Reparent <");
+                                    reparentPending_ = false;
+                                }
+                            });
                         }
                     }
                 });
@@ -437,7 +446,7 @@ public class MenuBar extends JMenuBar {
         newwindow.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                final MainFrame frame = new MainFrame(OS.isLinux(), false, false, null, null);
+                final MainFrame frame = new MainFrame(OS.isLinux(), false, false, null);
                 frame.setSize(800, 600);
                 frame.setVisible(true);
             }

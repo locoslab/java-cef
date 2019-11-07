@@ -59,6 +59,7 @@ bool Context::PreInitialize(JNIEnv* env, jobject c) {
   if (!javaClassLoader)
     return false;
   SetJavaClassLoader(env, javaClassLoader);
+  env->DeleteLocalRef(javaClassLoader);
 
   return true;
 }
@@ -116,8 +117,8 @@ bool Context::Initialize(JNIEnv* env,
   // DoMessageLoopWork.
   settings.external_message_pump = external_message_pump_;
 
-  CefRefPtr<ClientApp> client_app(
-      new ClientApp(module_dir, CefString(&settings.cache_path), appHandler));
+  CefRefPtr<ClientApp> client_app(new ClientApp(
+      module_dir, CefString(&settings.cache_path), env, appHandler));
   bool res = false;
 
 #if defined(OS_POSIX)

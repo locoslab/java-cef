@@ -4,13 +4,6 @@
 
 package tests.detailed;
 
-import java.awt.BorderLayout;
-import java.io.File;
-import java.lang.Thread.UncaughtExceptionHandler;
-
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-
 import org.cef.CefApp;
 import org.cef.CefApp.CefVersion;
 import org.cef.CefClient;
@@ -22,9 +15,20 @@ import org.cef.browser.CefFrame;
 import org.cef.browser.CefMessageRouter;
 import org.cef.browser.CefRequestContext;
 import org.cef.handler.CefDisplayHandlerAdapter;
+import org.cef.handler.CefFocusHandlerAdapter;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.handler.CefRequestContextHandlerAdapter;
 import org.cef.network.CefCookieManager;
+
+import java.awt.BorderLayout;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.io.File;
+import java.lang.Thread.UncaughtExceptionHandler;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
 
 import tests.detailed.dialog.DownloadDialog;
 import tests.detailed.handler.AppHandler;
@@ -38,6 +42,7 @@ import tests.detailed.handler.RequestHandler;
 import tests.detailed.ui.ControlPanel;
 import tests.detailed.ui.MenuBar;
 import tests.detailed.ui.StatusPanel;
+import tests.detailed.util.DataUri;
 
 public class MainFrame extends BrowserFrame {
     private static final long serialVersionUID = -2295538706810864538L;
@@ -53,7 +58,6 @@ public class MainFrame extends BrowserFrame {
         boolean osrEnabledArg = false;
         boolean transparentPaintingEnabledArg = false;
         boolean createImmediately = false;
-        String cookiePath = null;
         for (String arg : args) {
             arg = arg.toLowerCase();
             if (arg.equals("--off-screen-rendering-enabled")) {
@@ -62,16 +66,6 @@ public class MainFrame extends BrowserFrame {
                 transparentPaintingEnabledArg = true;
             } else if (arg.equals("--create-immediately")) {
                 createImmediately = true;
-            } else if (arg.startsWith("--cookie-path=")) {
-                cookiePath = arg.substring("--cookie-path=".length());
-                File testPath = new File(cookiePath);
-                if (!testPath.isDirectory() || !testPath.canWrite()) {
-                    System.out.println("Can't use " + cookiePath
-                            + " as cookie directory. Check if it exists and if it is writable");
-                    cookiePath = null;
-                } else {
-                    System.out.println("Storing cookies in " + cookiePath);
-                }
             }
         }
 
@@ -80,7 +74,7 @@ public class MainFrame extends BrowserFrame {
         // MainFrame keeps all the knowledge to display the embedded browser
         // frame.
         final MainFrame frame = new MainFrame(
-                osrEnabledArg, transparentPaintingEnabledArg, createImmediately, cookiePath, args);
+                osrEnabledArg, transparentPaintingEnabledArg, createImmediately, args);
         frame.setSize(800, 600);
         frame.setVisible(true);
     }
@@ -89,10 +83,10 @@ public class MainFrame extends BrowserFrame {
     private String errorMsg_ = "";
     private ControlPanel control_pane_;
     private StatusPanel status_panel_;
-    private final CefCookieManager cookieManager_;
+    private boolean browserFocus_ = true;
 
     public MainFrame(boolean osrEnabled, boolean transparentPaintingEnabled,
-            boolean createImmediately, String cookiePath, String[] args) {
+            boolean createImmediately, String[] args) {
         CefApp myApp;
         if (CefApp.getState() != CefApp.CefAppState.INITIALIZED) {
             // 1) CefApp is the entry point for JCEF. You can pass
@@ -180,7 +174,7 @@ public class MainFrame extends BrowserFrame {
                 status_panel_.setIsInProgress(isLoading);
 
                 if (!isLoading && !errorMsg_.isEmpty()) {
-                    browser.loadString(errorMsg_, control_pane_.getAddress());
+                    browser.loadURL(DataUri.create("text/html", errorMsg_));
                     errorMsg_ = "";
                 }
             }
@@ -201,44 +195,53 @@ public class MainFrame extends BrowserFrame {
             }
         });
 
-        // 3) Before we can display any content, we require an instance of
-        //    CefBrowser itself by calling createBrowser() on the CefClient.
-        //    You can create one to many browser instances per CefClient.
-        //
-        //    If the user has specified the application parameter "--cookie-path="
-        //    we provide our own cookie manager which persists cookies in a directory.
-        CefRequestContext requestContext = null;
-        if (cookiePath != null) {
-            cookieManager_ = CefCookieManager.createManager(cookiePath, false);
-            requestContext = CefRequestContext.createContext(new CefRequestContextHandlerAdapter() {
-                @Override
-                public CefCookieManager getCookieManager() {
-                    return cookieManager_;
-                }
-            });
-        } else {
-            cookieManager_ = CefCookieManager.getGlobalManager();
-        }
+        // Create the browser.
+        CefBrowser browser = client_.createBrowser(
+                "http://www.google.com", osrEnabled, transparentPaintingEnabled, null);
+        setBrowser(browser);
 
         // Set up the UI for this example implementation.
         JPanel contentPanel = createContentPanel();
         getContentPane().add(contentPanel, BorderLayout.CENTER);
 
-        // Create the browser.
-        CefBrowser browser = client_.createBrowser(
-                "http://www.google.com", osrEnabled, transparentPaintingEnabled, requestContext);
-        setBrowser(browser);
+        // Clear focus from the browser when the address field gains focus.
+        control_pane_.getAddressField().addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (!browserFocus_) return;
+                browserFocus_ = false;
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
+                control_pane_.getAddressField().requestFocus();
+            }
+        });
+
+        // Clear focus from the address field when the browser gains focus.
+        client_.addFocusHandler(new CefFocusHandlerAdapter() {
+            @Override
+            public void onGotFocus(CefBrowser browser) {
+                if (browserFocus_) return;
+                browserFocus_ = true;
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
+                browser.setFocus(true);
+            }
+
+            @Override
+            public void onTakeFocus(CefBrowser browser, boolean next) {
+                browserFocus_ = false;
+            }
+        });
 
         if (createImmediately) browser.createImmediately();
 
         // Add the browser to the UI.
         contentPanel.add(getBrowser().getUIComponent(), BorderLayout.CENTER);
 
-        MenuBar menuBar = new MenuBar(this, browser, control_pane_, downloadDialog, cookieManager_);
+        MenuBar menuBar = new MenuBar(
+                this, browser, control_pane_, downloadDialog, CefCookieManager.getGlobalManager());
 
         menuBar.addBookmark("Binding Test", "client://tests/binding_test.html");
         menuBar.addBookmark("Binding Test 2", "client://tests/binding_test2.html");
-        menuBar.addBookmark("Download Test", "http://cefbuilds.com");
+        menuBar.addBookmark("Download Test", "http://opensource.spotify.com/cefbuilds/index.html");
         menuBar.addBookmark("Login Test (username:pumpkin, password:pie)",
                 "http://www.colostate.edu/~ric/protect/your.html");
         menuBar.addBookmark("Certificate-error Test", "https://www.k2go.de");

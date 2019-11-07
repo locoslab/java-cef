@@ -4,21 +4,6 @@
 
 package org.cef;
 
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.FocusTraversalPolicy;
-import java.awt.KeyboardFocusManager;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Vector;
-
-import javax.swing.SwingUtilities;
-
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefBrowserFactory;
 import org.cef.browser.CefFrame;
@@ -48,6 +33,7 @@ import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefRenderHandler;
 import org.cef.handler.CefRequestHandler;
 import org.cef.handler.CefResourceHandler;
+import org.cef.handler.CefResourceRequestHandler;
 import org.cef.handler.CefWindowHandler;
 import org.cef.misc.BoolRef;
 import org.cef.misc.StringRef;
@@ -56,6 +42,21 @@ import org.cef.network.CefRequest.TransitionType;
 import org.cef.network.CefResponse;
 import org.cef.network.CefURLRequest;
 import org.cef.network.CefWebPluginInfo;
+
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.FocusTraversalPolicy;
+import java.awt.KeyboardFocusManager;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Vector;
+
+import javax.swing.SwingUtilities;
 
 /**
  * Client that owns a browser and renderer.
@@ -79,6 +80,19 @@ public class CefClient extends CefClientHandler
     private CefRequestHandler requestHandler_ = null;
     private boolean isDisposed_ = false;
     private volatile CefBrowser focusedBrowser_ = null;
+    private final PropertyChangeListener propertyChangeListener = new PropertyChangeListener() {
+        @Override
+        public void propertyChange(PropertyChangeEvent evt) {
+            if (focusedBrowser_ != null) {
+                Component browserUI = focusedBrowser_.getUIComponent();
+                Object oldUI = evt.getOldValue();
+                if (isPartOf(oldUI, browserUI)) {
+                    focusedBrowser_.setFocus(false);
+                    focusedBrowser_ = null;
+                }
+            }
+        }
+    };
 
     /**
      * The CTOR is only accessible within this package.
@@ -89,20 +103,8 @@ public class CefClient extends CefClientHandler
     CefClient() throws UnsatisfiedLinkError {
         super();
 
-        KeyboardFocusManager km = KeyboardFocusManager.getCurrentKeyboardFocusManager();
-        km.addPropertyChangeListener(new PropertyChangeListener() {
-            @Override
-            public void propertyChange(PropertyChangeEvent evt) {
-                if (focusedBrowser_ != null) {
-                    Component browserUI = focusedBrowser_.getUIComponent();
-                    Object oldUI = evt.getOldValue();
-                    if (isPartOf(oldUI, browserUI)) {
-                        focusedBrowser_.setFocus(false);
-                        focusedBrowser_ = null;
-                    }
-                }
-            }
-        });
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener(
+                propertyChangeListener);
     }
 
     private boolean isPartOf(Object obj, Component browserUI) {
@@ -517,6 +519,12 @@ public class CefClient extends CefClientHandler
     }
 
     @Override
+    public void onAfterParentChanged(CefBrowser browser) {
+        if (browser == null) return;
+        if (lifeSpanHandler_ != null) lifeSpanHandler_.onAfterParentChanged(browser);
+    }
+
+    @Override
     public boolean doClose(CefBrowser browser) {
         if (browser == null) return false;
         if (lifeSpanHandler_ != null) return lifeSpanHandler_.doClose(browser);
@@ -548,6 +556,8 @@ public class CefClient extends CefClientHandler
             }
 
             if (browser_.isEmpty() && isDisposed_) {
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener(
+                        propertyChangeListener);
                 removeContextMenuHandler(this);
                 removeDialogHandler(this);
                 removeDisplayHandler(this);
@@ -709,49 +719,22 @@ public class CefClient extends CefClientHandler
     }
 
     @Override
-    public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request) {
-        if (requestHandler_ != null && browser != null)
-            return requestHandler_.onBeforeResourceLoad(browser, frame, request);
-        return false;
-    }
-
-    @Override
-    public CefResourceHandler getResourceHandler(
-            CefBrowser browser, CefFrame frame, CefRequest request) {
-        if (requestHandler_ != null && browser != null)
-            return requestHandler_.getResourceHandler(browser, frame, request);
+    public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame,
+            CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator,
+            BoolRef disableDefaultHandling) {
+        if (requestHandler_ != null && browser != null) {
+            return requestHandler_.getResourceRequestHandler(browser, frame, request, isNavigation,
+                    isDownload, requestInitiator, disableDefaultHandling);
+        }
         return null;
     }
 
     @Override
-    public void onResourceRedirect(CefBrowser browser, CefFrame frame, CefRequest request,
-            CefResponse response, StringRef new_url) {
-        if (requestHandler_ != null && browser != null)
-            requestHandler_.onResourceRedirect(browser, frame, request, response, new_url);
-    }
-
-    @Override
-    public boolean onResourceResponse(
-            CefBrowser browser, CefFrame frame, CefRequest request, CefResponse response) {
-        if (requestHandler_ != null && browser != null)
-            return requestHandler_.onResourceResponse(browser, frame, request, response);
-        return false;
-    }
-
-    @Override
-    public void onResourceLoadComplete(CefBrowser browser, CefFrame frame, CefRequest request,
-            CefResponse response, CefURLRequest.Status status, long receivedContentLength) {
-        if (requestHandler_ != null && browser != null)
-            requestHandler_.onResourceLoadComplete(
-                    browser, frame, request, response, status, receivedContentLength);
-    }
-
-    @Override
-    public boolean getAuthCredentials(CefBrowser browser, CefFrame frame, boolean isProxy,
+    public boolean getAuthCredentials(CefBrowser browser, String origin_url, boolean isProxy,
             String host, int port, String realm, String scheme, CefAuthCallback callback) {
         if (requestHandler_ != null && browser != null)
             return requestHandler_.getAuthCredentials(
-                    browser, frame, isProxy, host, port, realm, scheme, callback);
+                    browser, origin_url, isProxy, host, port, realm, scheme, callback);
         return false;
     }
 
@@ -761,12 +744,6 @@ public class CefClient extends CefClientHandler
         if (requestHandler_ != null && browser != null)
             return requestHandler_.onQuotaRequest(browser, origin_url, new_size, callback);
         return false;
-    }
-
-    @Override
-    public void onProtocolExecution(CefBrowser browser, String url, BoolRef allow_os_execution) {
-        if (requestHandler_ != null && browser != null)
-            requestHandler_.onProtocolExecution(browser, url, allow_os_execution);
     }
 
     @Override

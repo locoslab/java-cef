@@ -7,16 +7,19 @@
 #pragma once
 
 #include <jni.h>
+
 #include <list>
+
 #include "include/cef_life_span_handler.h"
+
+#include "jni_scoped_helpers.h"
 
 // LifeSpanHandler implementation.
 class LifeSpanHandler : public CefLifeSpanHandler {
  public:
   LifeSpanHandler(JNIEnv* env, jobject handler);
-  virtual ~LifeSpanHandler();
 
-  // CefLifeSpanHandler methods
+  // CefLifeSpanHandler methods:
   virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                              const CefString& target_url,
@@ -27,16 +30,19 @@ class LifeSpanHandler : public CefLifeSpanHandler {
                              CefWindowInfo& windowInfo,
                              CefRefPtr<CefClient>& client,
                              CefBrowserSettings& settings,
+                             CefRefPtr<CefDictionaryValue>& extra_info,
                              bool* no_javascript_access) OVERRIDE;
   virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) OVERRIDE;
   virtual bool DoClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
   virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
 
+  void OnAfterParentChanged(CefRefPtr<CefBrowser> browser);
+
   void registerJBrowser(jobject browser);
   void unregisterJBrowser(jobject browser);
 
  protected:
-  jobject jhandler_;
+  ScopedJNIObjectGlobal handle_;
   std::list<jobject> jbrowsers_;
 
   // Include the default reference counting implementation.

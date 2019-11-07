@@ -238,17 +238,6 @@ JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1LoadURL(JNIEnv*,
 
 /*
  * Class:     org_cef_browser_CefBrowser_N
- * Method:    N_LoadString
- * Signature: (Ljava/lang/String;Ljava/lang/String;)V
- */
-JNIEXPORT void JNICALL
-Java_org_cef_browser_CefBrowser_1N_N_1LoadString(JNIEnv*,
-                                                 jobject,
-                                                 jstring,
-                                                 jstring);
-
-/*
- * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_ExecuteJavaScript
  * Signature: (Ljava/lang/String;Ljava/lang/String;I)V
  */
@@ -270,7 +259,7 @@ JNIEXPORT jstring JNICALL Java_org_cef_browser_CefBrowser_1N_N_1GetURL(JNIEnv*,
 /*
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_Close
- * Signature: ()V
+ * Signature: (Z)V
  */
 JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1Close(JNIEnv*,
                                                                    jobject,
@@ -516,12 +505,21 @@ JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1UpdateUI(JNIEnv*,
 /*
  * Class:     org_cef_browser_CefBrowser_N
  * Method:    N_SetParent
- * Signature: (Ljava/awt/Canvas;)V
+ * Signature: (JLjava/awt/Component;)V
  */
 JNIEXPORT void JNICALL Java_org_cef_browser_CefBrowser_1N_N_1SetParent(JNIEnv*,
                                                                        jobject,
                                                                        jlong,
                                                                        jobject);
+
+/*
+ * Class:     org_cef_browser_CefBrowser_N
+ * Method:    N_NotifyMoveOrResizeStarted
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL
+Java_org_cef_browser_CefBrowser_1N_N_1NotifyMoveOrResizeStarted(JNIEnv*,
+                                                                jobject);
 
 #ifdef __cplusplus
 }

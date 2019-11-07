@@ -7,6 +7,8 @@
 #include <X11/Xlib.h>
 #undef Success
 
+#include "include/base/cef_callback.h"
+
 #include "jni_util.h"
 #include "temp_window.h"
 
@@ -29,20 +31,6 @@ void X_XReparentWindow(unsigned long browserHandle,
   XReparentWindow(xdisplay, browserHandle, parentDrawable, 0, 0);
 }
 
-void X_XSetInputFocusParent(unsigned long browserHandle) {
-  ::Display* xdisplay = (::Display*)TempWindow::GetDisplay();
-
-  Window root_win;
-  Window parent_win;
-  Window* child_windows;
-  unsigned int num_child_windows;
-  XQueryTree(xdisplay, browserHandle, &root_win, &parent_win, &child_windows,
-             &num_child_windows);
-  XFree(child_windows);
-
-  XSetInputFocus(xdisplay, parent_win, RevertToParent, CurrentTime);
-}
-
 }  // namespace
 
 // This function is called by LifeSpanHandler::OnAfterCreated().
@@ -55,21 +43,21 @@ void AddCefBrowser(CefRefPtr<CefBrowser> browser) {
 
 // This function is called by LifeSpanHandler::DoClose().
 void DestroyCefBrowser(CefRefPtr<CefBrowser> browser) {
-  // TODO(jcef): Implement this function stub to do some platform dependent
-  // cleanup tasks for the browser reference.
-
-  UNUSED(browser);
+  browser->GetHost()->CloseBrowser(true);
 }
 
 CefWindowHandle GetWindowHandle(JNIEnv* env, jobject canvas) {
   return GetDrawableOfCanvas(canvas, env);
 }
 
-void SetParent(CefWindowHandle browserHandle, CefWindowHandle parentHandle) {
+void SetParent(CefWindowHandle browserHandle,
+               CefWindowHandle parentHandle,
+               const base::Closure& callback) {
   if (parentHandle == kNullWindowHandle)
     parentHandle = TempWindow::GetWindowHandle();
   if (parentHandle != kNullWindowHandle && browserHandle != kNullWindowHandle)
     X_XReparentWindow(browserHandle, parentHandle);
+  callback.Run();
 }
 
 void SetWindowBounds(CefWindowHandle browserHandle,
@@ -80,10 +68,6 @@ void SetWindowBounds(CefWindowHandle browserHandle,
 
 void SetWindowSize(CefWindowHandle browserHandle, int width, int height) {
   X_XMoveResizeWindow(browserHandle, 0, 0, width, height);
-}
-
-void FocusParent(CefWindowHandle browserHandle) {
-  X_XSetInputFocusParent(browserHandle);
 }
 
 }  // namespace util

@@ -4,19 +4,6 @@
 
 package org.cef.browser;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.Canvas;
-import java.awt.Component;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.Window;
-import java.awt.event.WindowEvent;
-import java.util.Vector;
-
-import javax.swing.SwingUtilities;
-
 import org.cef.CefClient;
 import org.cef.browser.CefRequestContext;
 import org.cef.callback.CefDragData;
@@ -25,11 +12,24 @@ import org.cef.callback.CefPdfPrintCallback;
 import org.cef.callback.CefRunFileDialogCallback;
 import org.cef.callback.CefStringVisitor;
 import org.cef.handler.CefClientHandler;
-import org.cef.handler.CefRenderHandler;
 import org.cef.handler.CefDialogHandler.FileDialogMode;
+import org.cef.handler.CefRenderHandler;
 import org.cef.handler.CefWindowHandler;
 import org.cef.misc.CefPdfPrintSettings;
 import org.cef.network.CefRequest;
+
+import java.awt.Canvas;
+import java.awt.Component;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Window;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.WindowEvent;
+import java.util.Vector;
+
+import javax.swing.SwingUtilities;
 
 /**
  * This class represents all methods which are connected to the
@@ -414,15 +414,6 @@ abstract class CefBrowser_N extends CefNativeAdapter implements CefBrowser {
     }
 
     @Override
-    public void loadString(String val, String url) {
-        try {
-            N_LoadString(val, url);
-        } catch (UnsatisfiedLinkError ule) {
-            ule.printStackTrace();
-        }
-    }
-
-    @Override
     public void executeJavaScript(String code, String url, int line) {
         try {
             N_ExecuteJavaScript(code, url, line);
@@ -736,6 +727,18 @@ abstract class CefBrowser_N extends CefNativeAdapter implements CefBrowser {
         }
     }
 
+    /**
+     * Call this method if the browser frame was moved.
+     * This fixes positioning of select popups and dismissal on window move/resize.
+     */
+    protected final void notifyMoveOrResizeStarted() {
+        try {
+            N_NotifyMoveOrResizeStarted();
+        } catch (UnsatisfiedLinkError ule) {
+            ule.printStackTrace();
+        }
+    }
+
     private final native boolean N_CreateBrowser(CefClientHandler clientHandler, long windowHandle,
             String url, boolean osr, boolean transparent, Component canvas,
             CefRequestContext context);
@@ -765,7 +768,6 @@ abstract class CefBrowser_N extends CefNativeAdapter implements CefBrowser {
     private final native void N_GetText(CefStringVisitor visitor);
     private final native void N_LoadRequest(CefRequest request);
     private final native void N_LoadURL(String url);
-    private final native void N_LoadString(String val, String url);
     private final native void N_ExecuteJavaScript(String code, String url, int line);
     private final native String N_GetURL();
     private final native void N_Close(boolean force);
@@ -799,4 +801,5 @@ abstract class CefBrowser_N extends CefNativeAdapter implements CefBrowser {
     private final native void N_DragSourceSystemDragEnded();
     private final native void N_UpdateUI(Rectangle contentRect, Rectangle browserRect);
     private final native void N_SetParent(long windowHandle, Component canvas);
+    private final native void N_NotifyMoveOrResizeStarted();
 }
