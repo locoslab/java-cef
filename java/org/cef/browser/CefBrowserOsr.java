@@ -7,6 +7,7 @@ package org.cef.browser;
 import com.jogamp.nativewindow.NativeSurface;
 import com.jogamp.opengl.GLAutoDrawable;
 import com.jogamp.opengl.GLCapabilities;
+import com.jogamp.opengl.GLContext;
 import com.jogamp.opengl.GLEventListener;
 import com.jogamp.opengl.GLProfile;
 import com.jogamp.opengl.awt.GLCanvas;
@@ -108,6 +109,8 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
             }
         };
 
+        // The GLContext will be re-initialized when changing displays, resulting in calls to
+        // dispose/init/reshape.
         canvas_.addGLEventListener(new GLEventListener() {
             @Override
             public void reshape(
@@ -243,9 +246,20 @@ class CefBrowserOsr extends CefBrowser_N implements CefRenderHandler {
     @Override
     public void onPaint(CefBrowser browser, boolean popup, Rectangle[] dirtyRects,
             ByteBuffer buffer, int width, int height) {
-        canvas_.getContext().makeCurrent();
+        // if window is closing, canvas_ or opengl context could be null
+        final GLContext context = canvas_ != null ? canvas_.getContext() : null;
+
+        if (context == null) {
+            return;
+        }
+
+        // This result can occur due to GLContext re-initialization when changing displays.
+        if (context.makeCurrent() == GLContext.CONTEXT_NOT_CURRENT) {
+            return;
+        }
+
         renderer_.onPaint(canvas_.getGL().getGL2(), popup, dirtyRects, buffer, width, height);
-        canvas_.getContext().release();
+        context.release();
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 canvas_.display();
